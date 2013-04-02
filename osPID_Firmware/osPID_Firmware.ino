@@ -116,7 +116,7 @@ void setup()
   lcd.setCursor(0,0);
   lcd.print(F(" osPID  "));
   lcd.setCursor(0,1);
-  lcd.print(F(" v1.61c "));
+  lcd.print(F(" v1.61d "));
   delay(1000);
 
   initializeEEPROM();
@@ -808,21 +808,14 @@ void ProfileRunTime()
       gotonext=true;
       myPID.SetMode(AUTOMATIC);
     }
-    else
-    {
-      setpoint = input;
-    }
   }
   else if(curType==5) //step-output-until_crossing_temp
   {
+    //float err = input-setpoint;
     if(input>=setpoint) //This will only be true for +ve step-output-temp_crossing profiles - i.e. ramp-to-soak during reflow soldering
     {
       gotonext=true;
       myPID.SetMode(AUTOMATIC);
-    }
-    else
-    {
-      setpoint = (curTime/1000); //This is a hack - the variable used to store a time variable is being used for a temp (setpoint) variable.
     }
   }
   else if(curType==127) //buzz
@@ -853,7 +846,7 @@ void ProfileRunTime()
 
 void calcNextProf()
 {
-  if(curProfStep>nProfSteps) // was curProfStep>=nProfSteps
+  if(curProfStep>=nProfSteps)
   {
     curType=0;
     helperTime=0;  
@@ -885,14 +878,14 @@ void calcNextProf()
   {
     myPID.SetMode(MANUAL);
     output = curVal;
-    //setpoint = input;
+    setpoint = input;
     helperTime = now;
   }
   else if(curType==5) //step-output-until_crossing_temp
   {
     myPID.SetMode(MANUAL);
     output = curVal;
-    //setpoint = (curTime/1000); //This is a hack - the variable used to store a time variable is being used for a temp (setpoint) variable.
+    setpoint = (curTime/1000); //This is a hack - the variable used to store a time variable is being used for a temp (setpoint) variable.
   }
   else if(curType==127) //buzzer
   {
