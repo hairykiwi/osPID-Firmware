@@ -116,7 +116,7 @@ void setup()
   lcd.setCursor(0,0);
   lcd.print(F(" osPID  "));
   lcd.setCursor(0,1);
-  lcd.print(F(" v1.61  "));
+  lcd.print(F(" v1.61a "));
   delay(1000);
 
   initializeEEPROM();
@@ -803,7 +803,11 @@ void ProfileRunTime()
   }
   else if(curType==4) //step-output
   {
-    if((now-helperTime)>curTime)gotonext=true;
+    if((now-helperTime)>curTime)
+    {
+      gotonext=true;
+      myPID.SetMode(AUTOMATIC);
+    }
   }
   else if(curType==127) //buzz
   {
@@ -837,8 +841,8 @@ void calcNextProf()
   {
     curType=0;
     helperTime =0;
-    setpoint = 0; //for safety
-    output = 0; //for safety
+    setpoint = 0; //for safety. Consider creating user-defined 'safe value'
+    output = 0; //for safety. Consider creating user-defined 'safe value'
     
   }
   else
@@ -866,9 +870,9 @@ void calcNextProf()
   }
   else if(curType==4) //step-output
   {
-    //myPID.SetMode(MANUAL);
+    myPID.SetMode(MANUAL);
     output = curVal;
-    //setpoint = 0;
+    setpoint = input;
     helperTime = now;
   }
   else if(curType==127) //buzzer
