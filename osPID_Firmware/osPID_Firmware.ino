@@ -801,9 +801,17 @@ void ProfileRunTime()
   {
     if((now-helperTime)>curTime)gotonext=true;
   }
-  else if(curType==4) //step-output
+  else if(curType==4) //step-output-time
   {
     if((now-helperTime)>curTime)
+    {
+      gotonext=true;
+      myPID.SetMode(AUTOMATIC);
+    }
+  }
+  else if(curType==5) //step-output-temp_crossing
+  {
+    if((input>=setpoint) //This will only be true for +ve step-output-temp_crossing profiles - i.e. ramp-to-soak during reflow soldering
     {
       gotonext=true;
       myPID.SetMode(AUTOMATIC);
@@ -868,12 +876,18 @@ void calcNextProf()
     setpoint = curVal;
     helperTime = now;
   }
-  else if(curType==4) //step-output
+  else if(curType==4) //step-output-time
   {
     myPID.SetMode(MANUAL);
     output = curVal;
     setpoint = input;
     helperTime = now;
+  }
+  else if(curType==5) //step-output-temp_crossing
+  {
+    myPID.SetMode(MANUAL);
+    output = curVal;
+    setpoint = (curTime/1000); //This is a hack - the variable used to store a time variable is being used for a temp (setpoint) variable.
   }
   else if(curType==127) //buzzer
   {
