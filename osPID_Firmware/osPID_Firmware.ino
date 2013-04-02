@@ -116,7 +116,7 @@ void setup()
   lcd.setCursor(0,0);
   lcd.print(F(" osPID  "));
   lcd.setCursor(0,1);
-  lcd.print(F(" v1.61d "));
+  lcd.print(F(" v1.61e ")); //replace with string value as this is reused in the Frontend
   delay(1000);
 
   initializeEEPROM();
@@ -803,20 +803,13 @@ void ProfileRunTime()
   }
   else if(curType==4) //step-output-period
   {
-    if((now-helperTime)>curTime)
-    {
-      gotonext=true;
+    if((now-helperTime)>curTime)gotonext=true;
       myPID.SetMode(AUTOMATIC);
-    }
   }
   else if(curType==5) //step-output-until_crossing_temp
   {
-    //float err = input-setpoint;
-    if(input>=setpoint) //This will only be true for +ve step-output-temp_crossing profiles - i.e. ramp-to-soak during reflow soldering
-    {
-      gotonext=true;
+    if(input>=setpoint)gotonext=true; //This will only be true for +ve step-output-temp_crossing profiles - i.e. ramp-to-soak during reflow soldering
       myPID.SetMode(AUTOMATIC);
-    }
   }
   else if(curType==127) //buzz
   {
@@ -1261,7 +1254,7 @@ void SerialSend()
 {
   if(sendInfo)
   {//just send out the stock identifier
-    Serial.print("\nosPID v1.50");
+    Serial.print("\nosPID v1.61e");
     InputSerialID();
     OutputSerialID();
     Serial.println("");
@@ -1336,6 +1329,12 @@ switch(curType)
   break;  
   case 3: //step
     Serial.println(curTime-(now-helperTime));
+  break;
+  case 4: //step-output-period
+    Serial.println(helperTime-now);
+  break;
+  case 5: //step-output-until_crosing_temp
+    Serial.println(curTime/1000);
   break;
   default: 
   break;
