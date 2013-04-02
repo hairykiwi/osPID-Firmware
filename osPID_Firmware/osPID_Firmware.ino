@@ -116,7 +116,7 @@ void setup()
   lcd.setCursor(0,0);
   lcd.print(F(" osPID  "));
   lcd.setCursor(0,1);
-  lcd.print(F(" v1.61a "));
+  lcd.print(F(" v1.61c "));
   delay(1000);
 
   initializeEEPROM();
@@ -801,20 +801,28 @@ void ProfileRunTime()
   {
     if((now-helperTime)>curTime)gotonext=true;
   }
-  else if(curType==4) //step-output-time
+  else if(curType==4) //step-output-period
   {
     if((now-helperTime)>curTime)
     {
       gotonext=true;
       myPID.SetMode(AUTOMATIC);
     }
+    else
+    {
+      setpoint = input;
+    }
   }
-  else if(curType==5) //step-output-temp_crossing
+  else if(curType==5) //step-output-until_crossing_temp
   {
-    if((input>=setpoint) //This will only be true for +ve step-output-temp_crossing profiles - i.e. ramp-to-soak during reflow soldering
+    if(input>=setpoint) //This will only be true for +ve step-output-temp_crossing profiles - i.e. ramp-to-soak during reflow soldering
     {
       gotonext=true;
       myPID.SetMode(AUTOMATIC);
+    }
+    else
+    {
+      setpoint = (curTime/1000); //This is a hack - the variable used to store a time variable is being used for a temp (setpoint) variable.
     }
   }
   else if(curType==127) //buzz
@@ -845,13 +853,10 @@ void ProfileRunTime()
 
 void calcNextProf()
 {
-  if(curProfStep>=nProfSteps) 
+  if(curProfStep>nProfSteps) // was curProfStep>=nProfSteps
   {
     curType=0;
-    helperTime =0;
-    setpoint = 0; //for safety. Consider creating user-defined 'safe value'
-    output = 0; //for safety. Consider creating user-defined 'safe value'
-    
+    helperTime=0;  
   }
   else
   { 
@@ -876,18 +881,18 @@ void calcNextProf()
     setpoint = curVal;
     helperTime = now;
   }
-  else if(curType==4) //step-output-time
+  else if(curType==4) //step-output-period
   {
     myPID.SetMode(MANUAL);
     output = curVal;
-    setpoint = input;
+    //setpoint = input;
     helperTime = now;
   }
-  else if(curType==5) //step-output-temp_crossing
+  else if(curType==5) //step-output-until_crossing_temp
   {
     myPID.SetMode(MANUAL);
     output = curVal;
-    setpoint = (curTime/1000); //This is a hack - the variable used to store a time variable is being used for a temp (setpoint) variable.
+    //setpoint = (curTime/1000); //This is a hack - the variable used to store a time variable is being used for a temp (setpoint) variable.
   }
   else if(curType==127) //buzzer
   {
@@ -904,6 +909,8 @@ void calcNextProf()
   { //we're done 
     runningProfile=false;
     curProfStep=0;
+    setpoint = 0; //for safety. Consider creating user-defined 'safe value'
+    output = 0; //for safety. Consider creating user-defined 'safe value'
     Serial.println("P_DN");
     digitalWrite(buzzerPin,LOW);
   } 
