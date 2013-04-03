@@ -781,7 +781,7 @@ void ProfileRunTime()
       setpoint = (curVal-helperVal)*(1-(float)(helperTime-now)/(float)(curTime))+helperVal; 
     }
   }
-  else if (curType==2) //wait
+  else if (curType==2) //wait //This needs attention - if input rises more quickly than curType=1 ramp rate(above), the crossing criteria is never met
   {
     float err = input-setpoint;
     if(helperflag) //we're just looking for a cross
