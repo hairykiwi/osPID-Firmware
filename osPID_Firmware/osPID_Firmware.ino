@@ -116,7 +116,7 @@ void setup()
   lcd.setCursor(0,0);
   lcd.print(F(" osPID  "));
   lcd.setCursor(0,1);
-  lcd.print(F(" v1.61e ")); //replace with string value as this is reused in the Frontend
+  lcd.print(F(" v1.61f ")); //replace with string value as this is reused in the Frontend
   delay(1000);
 
   initializeEEPROM();
@@ -803,13 +803,22 @@ void ProfileRunTime()
   }
   else if(curType==4) //step-output-period
   {
-    if((now-helperTime)>curTime)gotonext=true;
+    input =  ReadInputFromCard(); // input might be updated elsewhere, but done here just in case (me still learning)
+    setpoint = input;
+    if((now-helperTime)>curTime)
+    {
+      gotonext=true;
       myPID.SetMode(AUTOMATIC);
+    }
   }
   else if(curType==5) //step-output-until_crossing_temp
   {
-    if(input>=setpoint)gotonext=true; //This will only be true for +ve step-output-temp_crossing profiles - i.e. ramp-to-soak during reflow soldering
+    input =  ReadInputFromCard(); // input might be updated elsewhere, but done here just in case (me still learning)
+    if(input>=setpoint)
+    {
+      gotonext=true; //This will only be true for +ve step-output-temp_crossing profiles - i.e. ramp-to-soak during reflow soldering
       myPID.SetMode(AUTOMATIC);
+    }
   }
   else if(curType==127) //buzz
   {
@@ -871,14 +880,14 @@ void calcNextProf()
   {
     myPID.SetMode(MANUAL);
     output = curVal;
-    setpoint = input;
+    //setpoint = input; // setpoint mirrors the current measured temperature.
     helperTime = now;
   }
-  else if(curType==5) //step-output-until_crossing_temp
+  else if(curType==5) //step-output-until_crossing_temp - alternatively: step-output while input<setpoint
   {
     myPID.SetMode(MANUAL);
     output = curVal;
-    setpoint = (curTime/1000); //This is a hack - the variable used to store a time variable is being used for a temp (setpoint) variable.
+    setpoint = (curTime/1000); // This is a dirty hack - the '/1000 factor' results from the time variable being repurposed to store a temp variable.
   }
   else if(curType==127) //buzzer
   {
@@ -1254,7 +1263,7 @@ void SerialSend()
 {
   if(sendInfo)
   {//just send out the stock identifier
-    Serial.print("\nosPID v1.61e");
+    Serial.print("\nosPID v1.61f");
     InputSerialID();
     OutputSerialID();
     Serial.println("");
@@ -1331,10 +1340,10 @@ switch(curType)
     Serial.println(curTime-(now-helperTime));
   break;
   case 4: //step-output-period
-    Serial.println(helperTime-now);
+    Serial.println(helperTime-now); //Yet to be functionally verified
   break;
   case 5: //step-output-until_crosing_temp
-    Serial.println(curTime/1000);
+    Serial.println(curTime/1000); //Yet to be functionally verified
   break;
   default: 
   break;
