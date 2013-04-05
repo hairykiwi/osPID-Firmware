@@ -8,6 +8,9 @@
 #include "PID_AutoTune_v0_local.h"
 #include "io.h"
 
+// ***** Current Firmware Version string *****
+char FirmwareVersion[] = " v1.61g ";
+
 // ***** PIN ASSIGNMENTS *****
 
 const byte buzzerPin = 3;
@@ -116,7 +119,8 @@ void setup()
   lcd.setCursor(0,0);
   lcd.print(F(" osPID  "));
   lcd.setCursor(0,1);
-  lcd.print(F(" v1.61f ")); //replace with string value as this is reused in the Frontend
+  //lcd.print(F(" v1.60  "));
+  lcd.print(FirmwareVersion);
   delay(1000);
 
   initializeEEPROM();
@@ -762,8 +766,6 @@ void StopProfile()
 void ProfileRunTime()
 {
   if(tuning || !runningProfile) return;
-  
-
 
   boolean gotonext = false;
 
@@ -780,8 +782,12 @@ void ProfileRunTime()
     {
       setpoint = (curVal-helperVal)*(1-(float)(helperTime-now)/(float)(curTime))+helperVal; 
     }
+
   }
-  else if (curType==2) //wait //This needs attention - if input rises more quickly than curType=1 ramp rate(above), the crossing criteria is never met
+  else if (curType==2) //wait
+  //This possibly needs some attention - if waiting follows a ramp profile and input rises more
+  //quickly than ramp rate(above), the crossing criteria is not met during heating and only
+  //satisfied during cool-down - not so good for reflow soldering.
   {
     float err = input-setpoint;
     if(helperflag) //we're just looking for a cross
@@ -803,31 +809,38 @@ void ProfileRunTime()
   }
   else if(curType==4) //step-output-period
   {
-    input =  ReadInputFromCard(); // input might be updated elsewhere, but done here just in case (me still learning)
+    input =  ReadInputFromCard(); // force refresh of input value to ensure Processing display is refreshed in turn
     setpoint = input;
     if((now-helperTime)>curTime)
     {
       gotonext=true;
       myPID.SetMode(AUTOMATIC);
     }
+
   }
   else if(curType==5) //step-output-until_crossing_temp
   {
-    input =  ReadInputFromCard(); // input might be updated elsewhere, but done here just in case (me still learning)
+    input =  ReadInputFromCard(); // force refresh of input value to ensure Processing display is refreshed in turn
     if(input>=setpoint)
     {
-      gotonext=true; //This will only be true for +ve step-output-temp_crossing profiles - i.e. ramp-to-soak during reflow soldering
+      gotonext=true; //This will only be true for +ve-going step-output-until_crossing_temp profiles -
+      //perfect for ramp-to-soak during reflow soldering - reverse operation will require more logic or
+      //a separate profile type.
       myPID.SetMode(AUTOMATIC);
     }
+
   }
   else if(curType==127) //buzz
   {
+    input =  ReadInputFromCard(); // force refresh of input value to ensure Processing display is refreshed in turn
+    //2013-04-05 - Untested
     if(now<helperTime)digitalWrite(buzzerPin,HIGH);
     else 
     {
        digitalWrite(buzzerPin,LOW);
        gotonext=true;
     }
+
   }
   else
   { //unrecognized type, kill the profile
@@ -1263,7 +1276,9 @@ void SerialSend()
 {
   if(sendInfo)
   {//just send out the stock identifier
-    Serial.print("\nosPID v1.61f");
+    //Serial.print("\nosPID v1.50");
+    Serial.print("\nosPID");
+    Serial.print(FirmwareVersion); //will be concatenated with previous line
     InputSerialID();
     OutputSerialID();
     Serial.println("");
