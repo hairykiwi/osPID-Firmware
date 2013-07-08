@@ -13,7 +13,7 @@
 //controller, and also in the Processing terminal window.
 //NB: ENSURE NO TRAILING WHITESPACE in firmwareVersion string,
 //otherwise Processing hangs after pressing 'CONNECT'.
-String firmwareVersion = " v1.61h";
+String firmwareVersion = " v1.61i";
 
 // ***** PIN ASSIGNMENTS *****
 
@@ -763,6 +763,10 @@ void StopProfile()
 {
   if(runningProfile)
   {
+    // In case a manual profile type (eg type 4 or 5) is stopped,
+    //revert the controller to automatic mode.
+    myPID.SetMode(AUTOMATIC);
+    
     curProfStep=nProfSteps;
     calcNextProf(); //runningProfile will be set to false in here
   } 
