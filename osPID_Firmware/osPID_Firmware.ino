@@ -8,8 +8,12 @@
 #include "PID_AutoTune_v0_local.h"
 #include "io.h"
 
-// ***** Current Firmware Version string *****
-char FirmwareVersion[] = " v1.61g ";
+// ***** Current Firmware Version *****
+//This is the version data that will be reported during startup of the
+//controller, and also in the Processing terminal window.
+//NB: ENSURE NO TRAILING WHITESPACE in firmwareVersion string,
+//otherwise Processing hangs after pressing 'CONNECT'.
+String firmwareVersion = " v1.61h";
 
 // ***** PIN ASSIGNMENTS *****
 
@@ -83,7 +87,7 @@ boolean runningProfile = false;
 //simulation that can run on the osPID.  the problem is
 //that is uses memory.  rather than have it hogging resources
 //when not in use, it's activated using a compile flag.
-// this way, it doesn't get compiled during normal  circumstances
+// this way, it doesn't get compiled during normal circumstances
 
 #ifdef USE_SIMULATION
 double kpmodel = 5, taup = 50, theta[30];
@@ -119,8 +123,10 @@ void setup()
   lcd.setCursor(0,0);
   lcd.print(F(" osPID  "));
   lcd.setCursor(0,1);
-  //lcd.print(F(" v1.60  "));
-  lcd.print(FirmwareVersion);
+  lcd.print(firmwareVersion); //sending a string length shorter than
+  //the LCD can display appears to function without problem.
+  //i.e. No unwanted (spurious) characters are displayed along-side
+  //the version string.
   delay(1000);
 
   initializeEEPROM();
@@ -760,6 +766,7 @@ void StopProfile()
     curProfStep=nProfSteps;
     calcNextProf(); //runningProfile will be set to false in here
   } 
+  
 }
 
 
@@ -782,12 +789,12 @@ void ProfileRunTime()
     {
       setpoint = (curVal-helperVal)*(1-(float)(helperTime-now)/(float)(curTime))+helperVal; 
     }
-
   }
   else if (curType==2) //wait
-  //This possibly needs some attention - if waiting follows a ramp profile and input rises more
-  //quickly than ramp rate(above), the crossing criteria is not met during heating and only
-  //satisfied during cool-down - not so good for reflow soldering.
+  //This needs some attention. If a 'wait' follows a ramp profile and actual
+  //input increased at a faster rate than desired ramp rate, the
+  //crossing criteria is only met after the input DESCENDS back to
+  //the desired wait temperature - not so good for reflow soldering!
   {
     float err = input-setpoint;
     if(helperflag) //we're just looking for a cross
@@ -809,38 +816,36 @@ void ProfileRunTime()
   }
   else if(curType==4) //step-output-period
   {
-    input =  ReadInputFromCard(); // force refresh of input value to ensure Processing display is refreshed in turn
     setpoint = input;
     if((now-helperTime)>curTime)
     {
       gotonext=true;
-      myPID.SetMode(AUTOMATIC);
+      myPID.SetMode(AUTOMATIC); // Might result in a blip on the OP
+      //if subsequent profile is buzz (127) followed by type 4 or 5 again.
     }
-
   }
   else if(curType==5) //step-output-until_crossing_temp
   {
-    input =  ReadInputFromCard(); // force refresh of input value to ensure Processing display is refreshed in turn
-    if(input>=setpoint)
+    if(input>=setpoint)//This will only be true for a +ve-going profile -
+      //perfect for ramp-to-soak during reflow soldering, however
+      //reverse operation will require additional logic, or a separate profile type.
     {
-      gotonext=true; //This will only be true for +ve-going step-output-until_crossing_temp profiles -
-      //perfect for ramp-to-soak during reflow soldering - reverse operation will require more logic or
-      //a separate profile type.
-      myPID.SetMode(AUTOMATIC);
+      gotonext=true; 
+      myPID.SetMode(AUTOMATIC); // Might result in a blip on the OP
+     //if subsequent profile is buzz (127) followed by type 4 or 5 again.
     }
-
   }
   else if(curType==127) //buzz
   {
-    input =  ReadInputFromCard(); // force refresh of input value to ensure Processing display is refreshed in turn
-    //2013-04-05 - Untested
-    if(now<helperTime)digitalWrite(buzzerPin,HIGH);
+    if(now<helperTime)
+    {
+      digitalWrite(buzzerPin,HIGH);
+    }
     else 
     {
        digitalWrite(buzzerPin,LOW);
        gotonext=true;
     }
-
   }
   else
   { //unrecognized type, kill the profile
@@ -893,14 +898,16 @@ void calcNextProf()
   {
     myPID.SetMode(MANUAL);
     output = curVal;
-    //setpoint = input; // setpoint mirrors the current measured temperature.
+    //setpoint = input; // setpoint reflects the current measured temperature.
     helperTime = now;
   }
-  else if(curType==5) //step-output-until_crossing_temp - alternatively: step-output while input<setpoint
+  else if(curType==5) //step-output-until_crossing_temp
   {
     myPID.SetMode(MANUAL);
     output = curVal;
-    setpoint = (curTime/1000); // This is a dirty hack - the '/1000 factor' results from the time variable being repurposed to store a temp variable.
+    setpoint = (curTime/1000); // This is a dirty hack -
+    //the '/1000 factor' is required because the curTime variable
+    //is repurposed to hold a 'crossing temperature' value.
   }
   else if(curType==127) //buzzer
   {
@@ -1276,9 +1283,11 @@ void SerialSend()
 {
   if(sendInfo)
   {//just send out the stock identifier
-    //Serial.print("\nosPID v1.50");
-    Serial.print("\nosPID");
-    Serial.print(FirmwareVersion); //will be concatenated with previous line
+    String frontEndReportedVersion = String("\nosPID" + firmwareVersion);
+    Serial.print(frontEndReportedVersion); // Ensure the string
+    //'firmwareVersion' contains no trailing whitespace, otherwise:
+    //version is correctly reported in Processing's terminal window after
+    //pressing CONNECT, **BUT** Processing app hangs while "Connecting..."
     InputSerialID();
     OutputSerialID();
     Serial.println("");
@@ -1355,11 +1364,25 @@ switch(curType)
     Serial.println(curTime-(now-helperTime));
   break;
   case 4: //step-output-period
-    Serial.println(helperTime-now); //Yet to be functionally verified
+    //Without the following, the graph of the actively
+    //running profile within Processing is not refreshed.
+    //NB: Formula requires rework to provide useful info.
+    Serial.println(helperTime-now);
+    //Serial.println(curTime-(now-helperTime));
   break;
   case 5: //step-output-until_crosing_temp
-    Serial.println(curTime/1000); //Yet to be functionally verified
+    //Without the following, the graph of the actively
+    //running profile within Processing is not refreshed.
+    //NB: Formula requires rework to provide useful info.
+    Serial.println(curTime/1000);
+    //Serial.print(abs(input-setpoint));
+    //Serial.print(" ");
+    //Serial.println(curVal==0? -1 : float(now-helperTime));
   break;
+  case 127:
+    //Without the following, the graph of the actively
+    //running profile within Processing is not refreshed.
+    Serial.println(helperTime-now);
   default: 
   break;
   
@@ -1368,12 +1391,4 @@ switch(curType)
   }
   
 }
-
-
-
-
-
-
-
-
 
