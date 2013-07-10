@@ -13,7 +13,7 @@
 //controller, and also in the Processing terminal window.
 //NB: ENSURE NO TRAILING WHITESPACE in firmwareVersion string,
 //otherwise Processing hangs after pressing 'CONNECT'.
-String firmwareVersion = " v1.61i";
+String firmwareVersion = " v1.61j";
 
 // ***** PIN ASSIGNMENTS *****
 
@@ -65,6 +65,7 @@ byte curProfStep=0;
 byte curType=0;
 float curVal=0;
 float helperVal=0;
+float err=0;
 unsigned long helperTime=0;
 boolean helperflag=false;
 unsigned long curTime=0;
@@ -499,6 +500,9 @@ void back()
     {
       if(curMenu==1)
       { 
+        //Is this code reachable?
+        //The problem: When curMenu=1 (only one instance, above),
+        //changeflag=false.
         EEPROMBackupDash();
       }
       else if(curMenu==2) //tunings may have changed
@@ -763,10 +767,6 @@ void StopProfile()
 {
   if(runningProfile)
   {
-    // In case a manual profile type (eg type 4 or 5) is stopped,
-    //revert the controller to automatic mode.
-    myPID.SetMode(AUTOMATIC);
-    
     curProfStep=nProfSteps;
     calcNextProf(); //runningProfile will be set to false in here
   } 
@@ -800,7 +800,7 @@ void ProfileRunTime()
   //crossing criteria is only met after the input DESCENDS back to
   //the desired wait temperature - not so good for reflow soldering!
   {
-    float err = input-setpoint;
+    err = input-setpoint;
     if(helperflag) //we're just looking for a cross
     {
 
@@ -830,13 +830,18 @@ void ProfileRunTime()
   }
   else if(curType==5) //step-output-until_crossing_temp
   {
-    if(input>=setpoint)//This will only be true for a +ve-going profile -
-      //perfect for ramp-to-soak during reflow soldering, however
-      //reverse operation will require additional logic, or a separate profile type.
+    //'(curTime/1000)' = 'crossing_temperature' (synonymous with SP temp)
+    //for this profile only
+    err = input-(curTime/1000);
+    if(err==0 || (err>0 && helperVal<0) || (err<0 && helperVal>0))
     {
       gotonext=true; 
       myPID.SetMode(AUTOMATIC); // Might result in a blip on the OP
      //if subsequent profile is buzz (127) followed by type 4 or 5 again.
+    }
+    else
+    {
+      helperVal = err;
     }
   }
   else if(curType==127) //buzz
@@ -873,7 +878,23 @@ void calcNextProf()
   if(curProfStep>=nProfSteps)
   {
     curType=0;
-    helperTime=0;  
+    helperTime=0;
+    
+    //Some odd behaviour was witnessed whereby after running
+    //a profile and even though SP and Output appear to be set to zero
+    //(without the 'assistance' of the following two lines of code)
+    //the output was seen to be operating at approx 3%.
+    //NB: OP activity ceased immediately after a firmware reflash,
+    //Possibly this suggests EEPROM values were corectly restored?
+    //In the short period since including the following two lines,
+    //the problem has NOT resurfaced.
+    setpoint=0; // Or a system-specific safe value
+    output=0; // Or a system-specific safe value
+    
+    //In case a manual profile type (eg type 4 or 5) is stopped,
+    //the controller will require reverting to automatic mode.
+    myPID.SetMode(AUTOMATIC);
+    //EEPROMRestoreDash();  //Uncomment if required - just an idea.
   }
   else
   { 
@@ -912,6 +933,11 @@ void calcNextProf()
     setpoint = (curTime/1000); // This is a dirty hack -
     //the '/1000 factor' is required because the curTime variable
     //is repurposed to hold a 'crossing temperature' value.
+    
+    //We're (currently) only interested in an exact crossing,
+    //unlike the Type 2 WAIT profile, so no further conditional
+    //logic is necessary.
+    helperVal= input-setpoint;
   }
   else if(curType==127) //buzzer
   {
